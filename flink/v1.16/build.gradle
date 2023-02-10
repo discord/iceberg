@@ -143,7 +143,7 @@ project(":iceberg-flink:iceberg-flink-runtime-${flinkMajorVersion}") {
     implementation(project(":iceberg-flink:iceberg-flink-${flinkMajorVersion}")) {
       exclude group: 'org.apache.flink'
     }
-    implementation project(':iceberg-aws')
+    //implementation project(':iceberg-gcp')
     implementation(project(':iceberg-aliyun')) {
       exclude group: 'edu.umd.cs.findbugs', module: 'findbugs'
       exclude group: 'org.apache.httpcomponents', module: 'httpclient'
