@@ -1,33 +1,36 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *  * Licensed to the Apache Software Foundation (ASF) under one
+ *  * or more contributor license agreements.  See the NOTICE file
+ *  * distributed with this work for additional information
+ *  * regarding copyright ownership.  The ASF licenses this file
+ *  * to you under the Apache License, Version 2.0 (the
+ *  * "License"); you may not use this file except in compliance
+ *  * with the License.  You may obtain a copy of the License at
+ *  *
+ *  *   http://www.apache.org/licenses/LICENSE-2.0
+ *  *
+ *  * Unless required by applicable law or agreed to in writing,
+ *  * software distributed under the License is distributed on an
+ *  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  * KIND, either express or implied.  See the License for the
+ *  * specific language governing permissions and limitations
+ *  * under the License.
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
  */
-package org.apache.iceberg.flink.source.assigner.ordered;
 
-import java.io.Serializable;
+package org.apache.iceberg.flink.source.assigner;
+
 import javax.annotation.Nullable;
+import java.io.Serializable;
 
 /**
  * Global Watermark Tracker is used to track watermarks across a set of partitions in Flink job.
  * Watermark in this context captures the per-partition timestamp.
  *
- * @param <Partition> parametric type of partition
+ * @param <PartitionType> parametric type of partition
  */
-public interface GlobalWatermarkTracker<Partition> {
+interface GlobalWatermarkTracker<PartitionType> {
 
   /**
    * If none of the partitions have registered, then this returns null.
@@ -39,10 +42,10 @@ public interface GlobalWatermarkTracker<Partition> {
   Long getGlobalWatermark() throws Exception;
 
   // updates the local watermark for a given partition
-  Long updateWatermarkForPartition(Partition partition, long watermark) throws Exception;
+  Long updateWatermarkForPartition(PartitionType partition, long watermark) throws Exception;
 
   // updates the tracker that the partition has completed
-  void onPartitionCompletion(Partition partition) throws Exception;
+  void onPartitionCompletion(PartitionType partition) throws Exception;
 
   /**
    * This method is expected to be invoked when the partition has to register itself. This can also
@@ -50,20 +53,20 @@ public interface GlobalWatermarkTracker<Partition> {
    *
    * @param partition partition to be registered for the first time.
    */
-  void onPartitionInitialization(Partition partition);
+  void onPartitionInitialization(PartitionType partition);
 
   /**
    * This method allows the user to subscribe to global watermark updates.
    *
-   * @param partition partition for which you would like to listen to updates for.
+   * @param partitionType partition for which you would like to listen to updates for.
    * @param listener listener implementation that needs to be invoked on global watermark changes.
    */
-  void addListener(Partition partition, WatermarkTracker.Listener listener);
+  void addListener(PartitionType partitionType, WatermarkTracker.Listener listener);
 
-  void removeListener(Partition partition, WatermarkTracker.Listener listener);
+  void removeListener(PartitionType partitionType, WatermarkTracker.Listener listener);
 
   // gets a GlobalWatermarkTracker for a given partition
-  default WatermarkTracker forPartition(Partition partition) {
+  default WatermarkTracker forPartition(PartitionType partition) {
     return new WatermarkTracker() {
       @Nullable
       @Override
