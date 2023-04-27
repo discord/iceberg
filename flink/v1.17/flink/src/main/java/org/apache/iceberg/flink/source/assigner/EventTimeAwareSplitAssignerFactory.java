@@ -27,26 +27,29 @@ import org.apache.iceberg.flink.source.split.IcebergSourceSplit;
 import org.apache.iceberg.flink.source.split.IcebergSourceSplitState;
 
 public class EventTimeAwareSplitAssignerFactory implements SplitAssignerFactory {
-    private final WatermarkTracker watermarkTracker;
+    private final String sourceName;
+    private final GlobalWatermarkTracker.Factory trackerFactory;
     private final TimestampAssigner<IcebergSourceSplit> timestampAssigner;
 
     private final EventTimeAlignedAssigner.Options options;
 
     public EventTimeAwareSplitAssignerFactory(
-            WatermarkTracker watermarkTracker,
+            String sourceName,
+            GlobalWatermarkTracker.Factory trackerFactory,
             TimestampAssigner<IcebergSourceSplit> timestampAssigner, EventTimeAlignedAssigner.Options options) {
-        this.watermarkTracker = watermarkTracker;
+        this.sourceName = sourceName;
+        this.trackerFactory = trackerFactory;
         this.timestampAssigner = timestampAssigner;
         this.options = options;
     }
 
     @Override
     public SplitAssigner createAssigner() {
-        return new EventTimeAlignedAssigner(watermarkTracker, timestampAssigner, options);
+        return new EventTimeAlignedAssigner(trackerFactory.<String>apply("iceberg").forPartition(sourceName), timestampAssigner, options);
     }
 
     @Override
     public SplitAssigner createAssigner(Collection<IcebergSourceSplitState> assignerState) {
-        return new EventTimeAlignedAssigner(watermarkTracker, timestampAssigner, options);
+        return new EventTimeAlignedAssigner(trackerFactory.<String>apply("iceberg").forPartition(sourceName), timestampAssigner, options);
     }
 }
