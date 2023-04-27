@@ -22,12 +22,19 @@ import org.apache.flink.annotation.Internal;
 
 @Internal
 public enum SplitAssignerType {
-  SIMPLE {
-    @Override
-    public SplitAssignerFactory factory() {
-      return new SimpleSplitAssignerFactory();
-    }
-  };
+    SIMPLE {
+        @Override
+        public SplitAssignerFactory factory() {
+            return new SimpleSplitAssignerFactory();
+        }
+    };
 
-  public abstract SplitAssignerFactory factory();
+//    EVENT_TIME_ALIGNED {
+//        @Override
+//        public SplitAssignerFactory factory() {
+//            return new EventTimeAwareSplitAssignerFactory();
+//        }
+//    };
+
+    public abstract SplitAssignerFactory factory();
 }
