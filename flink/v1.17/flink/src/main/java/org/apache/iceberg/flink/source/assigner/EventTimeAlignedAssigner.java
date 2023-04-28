@@ -26,7 +26,7 @@ import java.time.Duration;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Set;
+import java.util.Objects;
 import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
@@ -38,8 +38,6 @@ import org.apache.iceberg.flink.source.split.IcebergSourceSplitState;
 import org.apache.iceberg.flink.source.split.IcebergSourceSplitStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.flink.calcite.shaded.com.google.common.collect.Iterables.getFirst;
 
 public class EventTimeAlignedAssigner implements SplitAssigner, WatermarkTracker.Listener {
   private static final Logger log = LoggerFactory.getLogger(EventTimeAlignedAssigner.class);
@@ -123,7 +121,7 @@ public class EventTimeAlignedAssigner implements SplitAssigner, WatermarkTracker
     return Math.max(splitTs - watermark, 0L) <= options.getThresholdInMs();
   }
 
-  private GetSplitResult getNextInternal() {
+  synchronized private GetSplitResult getNextInternal() {
     if (state.getUnassignedSplits().isEmpty()) {
       log.info("looks like there are no splits to be assigned");
       return GetSplitResult.unavailable();
@@ -131,7 +129,7 @@ public class EventTimeAlignedAssigner implements SplitAssigner, WatermarkTracker
 
     try {
       Long watermark = watermarkTracker.getGlobalWatermark();
-      IcebergSourceSplit pendingSplit = getFirst(state.getUnassignedSplits(), null);
+      IcebergSourceSplit pendingSplit = state.getUnassignedSplits().stream().filter(Objects::nonNull).findFirst().orElse(null);
       if (!isWithinBounds(pendingSplit, watermark)) {
         log.info(
                 "split {} is not within bounds {} {}",
@@ -224,7 +222,6 @@ public class EventTimeAlignedAssigner implements SplitAssigner, WatermarkTracker
     private static final Logger log = LoggerFactory.getLogger(State.class);
 
     private final WatermarkTracker tracker;
-
     private final TreeSet<IcebergSourceSplit> unassignedSplits;
     private final TreeSet<IcebergSourceSplit> assignedSplits;
     private final TimestampAssigner<IcebergSourceSplit> timestampAssigner;
@@ -240,16 +237,16 @@ public class EventTimeAlignedAssigner implements SplitAssigner, WatermarkTracker
       this.assignedSplits = new TreeSet<>(comparator);
     }
 
-    public Collection<IcebergSourceSplit> getUnassignedSplits() {
+    synchronized public Collection<IcebergSourceSplit> getUnassignedSplits() {
       return Collections.unmodifiableCollection(unassignedSplits);
     }
 
-    void onDiscoveredSplits(Collection<IcebergSourceSplit> splits) {
+    synchronized void onDiscoveredSplits(Collection<IcebergSourceSplit> splits) {
       unassignedSplits.addAll(splits);
       updateWatermark();
     }
 
-    public void onSplitAssigned(IcebergSourceSplit split) {
+    synchronized public void onSplitAssigned(IcebergSourceSplit split) {
       if (!unassignedSplits.contains(split)) {
         log.error("split={} not found in unassigned splits", split);
         throw new IllegalArgumentException("split not found in unassigned splits");
@@ -259,23 +256,20 @@ public class EventTimeAlignedAssigner implements SplitAssigner, WatermarkTracker
       updateWatermark();
     }
 
-    public void onUnassignedSplits(Collection<IcebergSourceSplit> splits) {
+    synchronized public void onUnassignedSplits(Collection<IcebergSourceSplit> splits) {
       assignedSplits.removeAll(splits);
       unassignedSplits.addAll(splits);
       updateWatermark();
     }
 
     public void onCompletedSplits(Collection<String> completedSplitIds) {
-      Set<IcebergSourceSplit> completed =
-              assignedSplits.stream()
-                      .filter(icebergSourceSplit -> completedSplitIds.contains(icebergSourceSplit.splitId()))
-                      .collect(Collectors.toSet());
-
-      assignedSplits.removeAll(completed);
+      synchronized (assignedSplits) {
+        assignedSplits.removeIf(split -> completedSplitIds.contains(split.splitId()));
+      }
       updateWatermark();
     }
 
-    public void onNoMoreStatusChanges() {
+    synchronized public void onNoMoreStatusChanges() {
       try {
         tracker.onCompletion();
       } catch (Exception e) {
@@ -283,7 +277,7 @@ public class EventTimeAlignedAssigner implements SplitAssigner, WatermarkTracker
       }
     }
 
-    private void updateWatermark() {
+    synchronized private void updateWatermark() {
       try {
         long v1 = !assignedSplits.isEmpty() ?
                 timestampAssigner.extractTimestamp(assignedSplits.first(), -1) : Long.MAX_VALUE;
